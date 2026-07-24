@@ -6,11 +6,15 @@ import { DiagramName } from './diagram-name';
 import { LastSaved } from './last-saved';
 import { LanguageNav } from './language-nav/language-nav';
 import { Menu } from './menu/menu';
+import { useFirebaseCollab } from '@/hooks/use-firebase-collab';
+import { CollabIndicator } from '@/components/collab-indicator/collab-indicator';
+import { ShareButton } from '@/components/share-button/share-button';
 
 export interface TopNavbarProps {}
 
 export const TopNavbar: React.FC<TopNavbarProps> = () => {
     const { effectiveTheme } = useTheme();
+    const { isCollabMode, isConnected, collabId } = useFirebaseCollab();
 
     const renderStars = useCallback(() => {
         return (
@@ -47,6 +51,13 @@ export const TopNavbar: React.FC<TopNavbarProps> = () => {
             </div>
             <DiagramName />
             <div className="hidden flex-1 items-center justify-end gap-2 sm:flex">
+                {isCollabMode && collabId && (
+                    <CollabIndicator
+                        collabId={collabId}
+                        isConnected={isConnected}
+                    />
+                )}
+                <ShareButton />
                 <LastSaved />
                 {renderStars()}
                 <LanguageNav />
@@ -54,3 +65,5 @@ export const TopNavbar: React.FC<TopNavbarProps> = () => {
         </nav>
     );
 };
+
+
