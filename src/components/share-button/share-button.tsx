@@ -1,6 +1,15 @@
 // src/components/share-button/share-button.tsx
 import React, { useCallback, useMemo, useState } from 'react';
-import { Share2, Copy, Check, Link, Users, AlertCircle } from 'lucide-react';
+import {
+    Share2,
+    Copy,
+    Check,
+    Link,
+    Users,
+    AlertCircle,
+    Loader2,
+    ExternalLink,
+} from 'lucide-react';
 import { Button } from '@/components/button/button';
 import {
     Popover,
@@ -10,12 +19,17 @@ import {
 import { Input } from '@/components/input/input';
 import { useChartDB } from '@/hooks/use-chartdb';
 import { isFirebaseConfigured } from '@/lib/firebase';
+import { saveDiagramToFirebase } from '@/lib/firebase-sync';
 import { Label } from '@/components/label/label';
 
 export const ShareButton: React.FC = () => {
-    const { diagramName } = useChartDB();
+    const { diagramName, currentDiagram } = useChartDB();
     const [copied, setCopied] = useState(false);
     const [customId, setCustomId] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    // Once saved, show the link panel instead of the create form
+    const [savedShareUrl, setSavedShareUrl] = useState<string | null>(null);
 
     const firebaseReady = useMemo(() => isFirebaseConfigured(), []);
 
@@ -37,30 +51,67 @@ export const ShareButton: React.FC = () => {
         return `${base}/?id=${encodeURIComponent(collabId)}`;
     }, [collabId]);
 
-    const handleCopy = useCallback(async () => {
+    const copyToClipboard = useCallback(async (url: string) => {
         try {
-            await navigator.clipboard.writeText(shareUrl);
+            await navigator.clipboard.writeText(url);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            setTimeout(() => setCopied(false), 3000);
         } catch {
-            // Fallback for older browsers
             const textarea = document.createElement('textarea');
-            textarea.value = shareUrl;
+            textarea.value = url;
             document.body.appendChild(textarea);
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            setTimeout(() => setCopied(false), 3000);
         }
-    }, [shareUrl]);
+    }, []);
 
+    // Save diagram to Firestore, then show + auto-copy the shareable link
+    const handleCreateLink = useCallback(async () => {
+        setIsSaving(true);
+        setSaveError(null);
+        try {
+            await saveDiagramToFirebase(collabId, currentDiagram);
+            const url = shareUrl;
+            setSavedShareUrl(url);
+            await copyToClipboard(url);
+        } catch (error) {
+            console.error('[ShareButton] Error saving diagram:', error);
+            setSaveError(
+                'Error al guardar. Verifica la configuración de Firebase.'
+            );
+        } finally {
+            setIsSaving(false);
+        }
+    }, [collabId, currentDiagram, shareUrl, copyToClipboard]);
+
+    // Copy the already-generated link
+    const handleCopyLink = useCallback(async () => {
+        if (savedShareUrl) {
+            await copyToClipboard(savedShareUrl);
+        }
+    }, [savedShareUrl, copyToClipboard]);
+
+    // Open the collab URL in a new tab
     const handleOpenLink = useCallback(() => {
-        window.location.href = shareUrl;
-    }, [shareUrl]);
+        if (savedShareUrl) {
+            window.open(savedShareUrl, '_blank');
+        }
+    }, [savedShareUrl]);
+
+    // Reset state when popover closes
+    const handleOpenChange = useCallback((open: boolean) => {
+        if (!open) {
+            setSavedShareUrl(null);
+            setSaveError(null);
+            setCopied(false);
+        }
+    }, []);
 
     return (
-        <Popover>
+        <Popover onOpenChange={handleOpenChange}>
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
@@ -108,19 +159,19 @@ export const ShareButton: React.FC = () => {
                                 y redespliega.
                             </p>
                         </div>
-                    ) : (
-                        /* ── Firebase configured — share UI ── */
+                    ) : !savedShareUrl ? (
+                        /* ── Phase 1: Create the collab link ── */
                         <>
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
                                     <Share2 className="size-4 text-pink-500" />
                                     <h4 className="text-sm font-semibold">
-                                        Invitar editor
+                                        Compartir diagrama
                                     </h4>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Cualquier persona con este enlace podrá
-                                    editar el diagrama en tiempo real.
+                                    Crea un enlace colaborativo para que otros
+                                    puedan editar este diagrama en tiempo real.
                                 </p>
                             </div>
 
@@ -129,7 +180,7 @@ export const ShareButton: React.FC = () => {
                                     htmlFor="collab-id-input"
                                     className="text-xs text-muted-foreground"
                                 >
-                                    ID del diagrama colaborativo
+                                    Nombre del enlace (opcional)
                                 </Label>
                                 <Input
                                     id="collab-id-input"
@@ -139,7 +190,46 @@ export const ShareButton: React.FC = () => {
                                         setCustomId(e.target.value)
                                     }
                                     className="h-8 text-xs"
+                                    disabled={isSaving}
                                 />
+                            </div>
+
+                            {saveError && (
+                                <p className="text-xs text-red-500">
+                                    {saveError}
+                                </p>
+                            )}
+
+                            <Button
+                                size="sm"
+                                className="w-full gap-1.5"
+                                onClick={handleCreateLink}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                    <Link className="size-3.5" />
+                                )}
+                                {isSaving
+                                    ? 'Guardando diagrama...'
+                                    : 'Crear enlace colaborativo'}
+                            </Button>
+                        </>
+                    ) : (
+                        /* ── Phase 2: Link created — show & copy ── */
+                        <>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                    <Check className="size-4 text-green-500" />
+                                    <h4 className="text-sm font-semibold">
+                                        ¡Enlace creado!
+                                    </h4>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    El enlace se copió al portapapeles.
+                                    Compártelo con quien quieras que colabore.
+                                </p>
                             </div>
 
                             <div className="flex flex-col gap-1.5">
@@ -149,7 +239,7 @@ export const ShareButton: React.FC = () => {
                                 <div className="flex items-center gap-1.5">
                                     <Input
                                         readOnly
-                                        value={shareUrl}
+                                        value={savedShareUrl}
                                         className="h-8 flex-1 text-xs"
                                         onFocus={(e) => e.target.select()}
                                     />
@@ -157,7 +247,7 @@ export const ShareButton: React.FC = () => {
                                         variant="outline"
                                         size="sm"
                                         className="h-8 shrink-0 px-2"
-                                        onClick={handleCopy}
+                                        onClick={handleCopyLink}
                                     >
                                         {copied ? (
                                             <Check className="size-3.5 text-green-500" />
@@ -169,12 +259,13 @@ export const ShareButton: React.FC = () => {
                             </div>
 
                             <Button
+                                variant="outline"
                                 size="sm"
                                 className="w-full gap-1.5"
                                 onClick={handleOpenLink}
                             >
-                                <Link className="size-3.5" />
-                                Abrir en modo colaborativo
+                                <ExternalLink className="size-3.5" />
+                                Abrir en nueva pestaña
                             </Button>
                         </>
                     )}
@@ -183,3 +274,4 @@ export const ShareButton: React.FC = () => {
         </Popover>
     );
 };
+
