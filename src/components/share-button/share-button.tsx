@@ -102,8 +102,7 @@ export const ShareButton: React.FC = () => {
                             <p className="text-xs text-muted-foreground">
                                 Agrégalas en{' '}
                                 <strong>
-                                    Netlify → Site Settings →
-                                    Environment
+                                    Netlify → Site Settings → Environment
                                     Variables
                                 </strong>{' '}
                                 y redespliega.
