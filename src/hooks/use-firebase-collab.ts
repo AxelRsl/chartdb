@@ -116,7 +116,8 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
         if (isRemoteUpdateRef.current) return;
         // Don't save until we've loaded the initial remote state
         // (avoids overwriting remote data with empty local state)
-        if (!hasLoadedRemoteRef.current && !currentDiagram.tables?.length) return;
+        if (!hasLoadedRemoteRef.current && !currentDiagram.tables?.length)
+            return;
 
         if (saveTimerRef.current) {
             clearTimeout(saveTimerRef.current);
@@ -133,7 +134,6 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
                 clearTimeout(saveTimerRef.current);
             }
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentDiagram, isCollabMode, collabId]);
 
     return {

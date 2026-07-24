@@ -65,5 +65,3 @@ export const TopNavbar: React.FC<TopNavbarProps> = () => {
         </nav>
     );
 };
-
-
