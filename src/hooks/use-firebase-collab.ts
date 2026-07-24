@@ -76,6 +76,12 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
             },
             () => {
                 setIsConnected(false);
+            },
+            // Document doesn't exist yet — bootstrap with local diagram
+            () => {
+                hasLoadedRemoteRef.current = true;
+                setIsConnected(true);
+                saveDiagramToFirebase(collabId, currentDiagram);
             }
         );
 

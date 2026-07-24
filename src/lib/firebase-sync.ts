@@ -81,7 +81,8 @@ export async function saveDiagramToFirebase(
 export function subscribeToFirebaseDiagram(
     collabId: string,
     onData: (diagram: Diagram) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    onNotFound?: () => void
 ): Unsubscribe | null {
     const firestore = getFirestoreDB();
     if (!firestore) return null;
@@ -102,6 +103,9 @@ export function subscribeToFirebaseDiagram(
                         err
                     );
                 }
+            } else {
+                // Document doesn't exist yet — notify the caller
+                onNotFound?.();
             }
         },
         (error) => {
