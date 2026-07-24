@@ -21,16 +21,10 @@ function serialiseDiagram(diagram: Diagram): Record<string, unknown> {
         databaseType: diagram.databaseType,
         databaseEdition: diagram.databaseEdition ?? null,
         tables: JSON.parse(JSON.stringify(diagram.tables ?? [])),
-        relationships: JSON.parse(
-            JSON.stringify(diagram.relationships ?? [])
-        ),
-        dependencies: JSON.parse(
-            JSON.stringify(diagram.dependencies ?? [])
-        ),
+        relationships: JSON.parse(JSON.stringify(diagram.relationships ?? [])),
+        dependencies: JSON.parse(JSON.stringify(diagram.dependencies ?? [])),
         areas: JSON.parse(JSON.stringify(diagram.areas ?? [])),
-        customTypes: JSON.parse(
-            JSON.stringify(diagram.customTypes ?? [])
-        ),
+        customTypes: JSON.parse(JSON.stringify(diagram.customTypes ?? [])),
         notes: JSON.parse(JSON.stringify(diagram.notes ?? [])),
         createdAt: diagram.createdAt.toISOString(),
         updatedAt: diagram.updatedAt.toISOString(),
@@ -41,14 +35,13 @@ function serialiseDiagram(diagram: Diagram): Record<string, unknown> {
 /**
  * Deserialise a Firestore document snapshot into a Diagram object.
  */
-function deserialiseDiagram(
-    data: Record<string, unknown>
-): Diagram {
+function deserialiseDiagram(data: Record<string, unknown>): Diagram {
     return {
         id: data.id as string,
         name: data.name as string,
         databaseType: data.databaseType as Diagram['databaseType'],
-        databaseEdition: (data.databaseEdition as Diagram['databaseEdition']) ?? undefined,
+        databaseEdition:
+            (data.databaseEdition as Diagram['databaseEdition']) ?? undefined,
         tables: (data.tables as Diagram['tables']) ?? [],
         relationships: (data.relationships as Diagram['relationships']) ?? [],
         dependencies: (data.dependencies as Diagram['dependencies']) ?? [],
