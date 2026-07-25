@@ -23,6 +23,7 @@ import { AlertProvider } from '@/context/alert-context/alert-provider';
 import { CanvasProvider } from '@/context/canvas-context/canvas-provider';
 import { HIDE_CHARTDB_CLOUD } from '@/lib/env';
 import { useDiagramLoader } from './use-diagram-loader';
+import { useFirebaseCollab } from '@/hooks/use-firebase-collab';
 import { DiffProvider } from '@/context/diff-context/diff-provider';
 import { TopNavbarMock } from './top-navbar/top-navbar-mock';
 import { DiagramFilterProvider } from '@/context/diagram-filter-context/diagram-filter-provider';
@@ -45,6 +46,7 @@ const EditorPageComponent: React.FC = () => {
     const { starUsDialogLastOpen, setStarUsDialogLastOpen, githubRepoOpened } =
         useLocalConfig();
     const { initialDiagram } = useDiagramLoader();
+    useFirebaseCollab();
 
     useEffect(() => {
         if (HIDE_CHARTDB_CLOUD) {

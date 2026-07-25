@@ -6,11 +6,13 @@ import { useRedoUndoStack } from '@/hooks/use-redo-undo-stack';
 import { useStorage } from '@/hooks/use-storage';
 import type { Diagram } from '@/lib/domain/diagram';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 export const useDiagramLoader = () => {
     const [initialDiagram, setInitialDiagram] = useState<Diagram | undefined>();
     const { diagramId } = useParams<{ diagramId: string }>();
+    const [searchParams] = useSearchParams();
+    const collabId = searchParams.get('id');
     const { config } = useConfig();
     const { loadDiagram, currentDiagram } = useChartDB();
     const { resetRedoStack, resetUndoStack } = useRedoUndoStack();
@@ -23,6 +25,12 @@ export const useDiagramLoader = () => {
 
     useEffect(() => {
         if (!config) {
+            return;
+        }
+
+        // If real-time collab link is present in URL (?id=...),
+        // do not navigate away to local default diagram or open selection dialogs.
+        if (collabId) {
             return;
         }
 
@@ -86,6 +94,7 @@ export const useDiagramLoader = () => {
         showLoader,
         currentDiagram?.id,
         openOpenDiagramDialog,
+        collabId,
     ]);
 
     return { initialDiagram };
