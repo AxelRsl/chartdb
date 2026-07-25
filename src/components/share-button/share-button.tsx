@@ -1,5 +1,6 @@
 // src/components/share-button/share-button.tsx
 import React, { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Share2,
     Copy,
@@ -8,7 +9,6 @@ import {
     Users,
     AlertCircle,
     Loader2,
-    ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/button/button';
 import {
@@ -21,35 +21,25 @@ import { useChartDB } from '@/hooks/use-chartdb';
 import { isFirebaseConfigured } from '@/lib/firebase';
 import { saveDiagramToFirebase } from '@/lib/firebase-sync';
 import { Label } from '@/components/label/label';
+import { generateId } from '@/lib/utils';
 
 export const ShareButton: React.FC = () => {
-    const { diagramName, currentDiagram } = useChartDB();
+    const { currentDiagram } = useChartDB();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeCollabId = searchParams.get('id');
+
     const [copied, setCopied] = useState(false);
-    const [customId, setCustomId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
-    // Once saved, show the link panel instead of the create form
-    const [savedShareUrl, setSavedShareUrl] = useState<string | null>(null);
 
     const firebaseReady = useMemo(() => isFirebaseConfigured(), []);
 
-    // Build a slug from the diagram name, falling back to a timestamp
-    const defaultSlug = useMemo(() => {
-        if (diagramName) {
-            return diagramName
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-+|-+$/g, '');
-        }
-        return `diagram-${Date.now()}`;
-    }, [diagramName]);
-
-    const collabId = customId.trim() || defaultSlug;
-
-    const shareUrl = useMemo(() => {
+    // Get the shareable URL based on the active collabId (or null if not created yet)
+    const currentShareUrl = useMemo(() => {
+        if (!activeCollabId) return null;
         const base = window.location.origin;
-        return `${base}/?id=${encodeURIComponent(collabId)}`;
-    }, [collabId]);
+        return `${base}/?id=${encodeURIComponent(activeCollabId)}`;
+    }, [activeCollabId]);
 
     const copyToClipboard = useCallback(async (url: string) => {
         try {
@@ -68,50 +58,37 @@ export const ShareButton: React.FC = () => {
         }
     }, []);
 
-    // Save diagram to Firestore, then show + auto-copy the shareable link
-    const handleCreateLink = useCallback(async () => {
+    // Generate a unique collab ID, save to Firestore, update URL params, and copy link
+    const handleGenerateLink = useCallback(async () => {
         setIsSaving(true);
         setSaveError(null);
         try {
-            await saveDiagramToFirebase(collabId, currentDiagram);
-            const url = shareUrl;
-            setSavedShareUrl(url);
-            await copyToClipboard(url);
+            const newCollabId = generateId();
+            await saveDiagramToFirebase(newCollabId, currentDiagram);
+
+            // Set URL search param ?id=newCollabId so app enters collab mode
+            setSearchParams({ id: newCollabId }, { replace: true });
+
+            const newUrl = `${window.location.origin}/?id=${encodeURIComponent(newCollabId)}`;
+            await copyToClipboard(newUrl);
         } catch (error) {
             console.error('[ShareButton] Error saving diagram:', error);
             setSaveError(
-                'Error al guardar. Verifica la configuración de Firebase.'
+                'Error al guardar en Firebase. Inténtalo de nuevo.'
             );
         } finally {
             setIsSaving(false);
         }
-    }, [collabId, currentDiagram, shareUrl, copyToClipboard]);
+    }, [currentDiagram, setSearchParams, copyToClipboard]);
 
-    // Copy the already-generated link
-    const handleCopyLink = useCallback(async () => {
-        if (savedShareUrl) {
-            await copyToClipboard(savedShareUrl);
+    const handleCopy = useCallback(async () => {
+        if (currentShareUrl) {
+            await copyToClipboard(currentShareUrl);
         }
-    }, [savedShareUrl, copyToClipboard]);
-
-    // Open the collab URL in a new tab
-    const handleOpenLink = useCallback(() => {
-        if (savedShareUrl) {
-            window.open(savedShareUrl, '_blank');
-        }
-    }, [savedShareUrl]);
-
-    // Reset state when popover closes
-    const handleOpenChange = useCallback((open: boolean) => {
-        if (!open) {
-            setSavedShareUrl(null);
-            setSaveError(null);
-            setCopied(false);
-        }
-    }, []);
+    }, [currentShareUrl, copyToClipboard]);
 
     return (
-        <Popover onOpenChange={handleOpenChange}>
+        <Popover>
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
@@ -137,30 +114,11 @@ export const ShareButton: React.FC = () => {
                             <p className="text-xs leading-relaxed text-muted-foreground">
                                 Para habilitar la colaboración en tiempo real,
                                 necesitas configurar las variables de entorno de
-                                Firebase:
-                            </p>
-                            <div className="rounded-md bg-muted p-2">
-                                <code className="block text-[10px] leading-relaxed text-muted-foreground">
-                                    VITE_FIREBASE_API_KEY
-                                    <br />
-                                    VITE_FIREBASE_AUTH_DOMAIN
-                                    <br />
-                                    VITE_FIREBASE_PROJECT_ID
-                                    <br />
-                                    VITE_FIREBASE_APP_ID
-                                </code>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Agrégalas en{' '}
-                                <strong>
-                                    Netlify → Site Settings → Environment
-                                    Variables
-                                </strong>{' '}
-                                y redespliega.
+                                Firebase.
                             </p>
                         </div>
-                    ) : !savedShareUrl ? (
-                        /* ── Phase 1: Create the collab link ── */
+                    ) : !activeCollabId ? (
+                        /* ── State 1: Link not generated yet ── */
                         <>
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
@@ -170,28 +128,9 @@ export const ShareButton: React.FC = () => {
                                     </h4>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Crea un enlace colaborativo para que otros
-                                    puedan editar este diagrama en tiempo real.
+                                    Genera un enlace único para permitir que
+                                    otros editen este diagrama en tiempo real.
                                 </p>
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                                <Label
-                                    htmlFor="collab-id-input"
-                                    className="text-xs text-muted-foreground"
-                                >
-                                    Nombre del enlace (opcional)
-                                </Label>
-                                <Input
-                                    id="collab-id-input"
-                                    placeholder={defaultSlug}
-                                    value={customId}
-                                    onChange={(e) =>
-                                        setCustomId(e.target.value)
-                                    }
-                                    className="h-8 text-xs"
-                                    disabled={isSaving}
-                                />
                             </div>
 
                             {saveError && (
@@ -203,7 +142,7 @@ export const ShareButton: React.FC = () => {
                             <Button
                                 size="sm"
                                 className="w-full gap-1.5"
-                                onClick={handleCreateLink}
+                                onClick={handleGenerateLink}
                                 disabled={isSaving}
                             >
                                 {isSaving ? (
@@ -212,34 +151,33 @@ export const ShareButton: React.FC = () => {
                                     <Link className="size-3.5" />
                                 )}
                                 {isSaving
-                                    ? 'Guardando diagrama...'
-                                    : 'Crear enlace colaborativo'}
+                                    ? 'Guardando en Firebase...'
+                                    : 'Generar enlace colaborativo'}
                             </Button>
                         </>
                     ) : (
-                        /* ── Phase 2: Link created — show & copy ── */
+                        /* ── State 2: Link already generated / in collab mode ── */
                         <>
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
                                     <Check className="size-4 text-green-500" />
                                     <h4 className="text-sm font-semibold">
-                                        ¡Enlace creado!
+                                        Enlace colaborativo activo
                                     </h4>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    El enlace se copió al portapapeles.
-                                    Compártelo con quien quieras que colabore.
+                                    Este diagrama está listo para colaboración en tiempo real. Compártelo con quien quieras.
                                 </p>
                             </div>
 
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs text-muted-foreground">
-                                    Enlace para compartir
+                                    Enlace de colaboración
                                 </Label>
                                 <div className="flex items-center gap-1.5">
                                     <Input
                                         readOnly
-                                        value={savedShareUrl}
+                                        value={currentShareUrl ?? ''}
                                         className="h-8 flex-1 text-xs"
                                         onFocus={(e) => e.target.select()}
                                     />
@@ -247,7 +185,7 @@ export const ShareButton: React.FC = () => {
                                         variant="outline"
                                         size="sm"
                                         className="h-8 shrink-0 px-2"
-                                        onClick={handleCopyLink}
+                                        onClick={handleCopy}
                                     >
                                         {copied ? (
                                             <Check className="size-3.5 text-green-500" />
@@ -257,16 +195,6 @@ export const ShareButton: React.FC = () => {
                                     </Button>
                                 </div>
                             </div>
-
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full gap-1.5"
-                                onClick={handleOpenLink}
-                            >
-                                <ExternalLink className="size-3.5" />
-                                Abrir en nueva pestaña
-                            </Button>
                         </>
                     )}
                 </div>
