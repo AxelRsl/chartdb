@@ -27,11 +27,13 @@ import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { useLocalConfig } from '@/hooks/use-local-config';
 import { useNavigate } from 'react-router-dom';
+import { useFirebaseCollab } from '@/hooks/use-firebase-collab';
 import { useAlert } from '@/context/alert-context/alert-context';
 
 export interface MenuProps {}
 
 export const Menu: React.FC<MenuProps> = () => {
+    const { isCollaborator, canEdit } = useFirebaseCollab();
     const {
         clearDiagramData,
         deleteDiagram,
@@ -73,10 +75,12 @@ export const Menu: React.FC<MenuProps> = () => {
     }, [deleteDiagram, navigate]);
 
     const createNewDiagram = () => {
+        if (isCollaborator) return;
         openCreateDiagramDialog();
     };
 
     const openDiagram = () => {
+        if (isCollaborator) return;
         openOpenDiagramDialog();
     };
 
@@ -152,18 +156,29 @@ export const Menu: React.FC<MenuProps> = () => {
             <MenubarMenu>
                 <MenubarTrigger>{t('menu.actions.actions')}</MenubarTrigger>
                 <MenubarContent>
-                    <MenubarItem onClick={createNewDiagram}>
+                    <MenubarItem onClick={createNewDiagram} disabled={isCollaborator}>
                         {t('menu.actions.new')}
+                        {isCollaborator && (
+                            <span className="ml-auto text-[10px] text-muted-foreground font-normal">
+                                (Colaborador)
+                            </span>
+                        )}
                     </MenubarItem>
-                    <MenubarItem onClick={openDiagram}>
+                    <MenubarItem onClick={openDiagram} disabled={isCollaborator}>
                         {t('menu.actions.browse')}
-                        <MenubarShortcut>
-                            {
-                                keyboardShortcutsForOS[
-                                    KeyboardShortcutAction.OPEN_DIAGRAM
-                                ].keyCombinationLabel
-                            }
-                        </MenubarShortcut>
+                        {isCollaborator ? (
+                            <span className="ml-auto text-[10px] text-muted-foreground font-normal">
+                                (Colaborador)
+                            </span>
+                        ) : (
+                            <MenubarShortcut>
+                                {
+                                    keyboardShortcutsForOS[
+                                        KeyboardShortcutAction.OPEN_DIAGRAM
+                                    ].keyCombinationLabel
+                                }
+                            </MenubarShortcut>
+                        )}
                     </MenubarItem>
                     <MenubarItem onClick={updateDiagramUpdatedAt}>
                         {t('menu.actions.save')}
@@ -177,11 +192,11 @@ export const Menu: React.FC<MenuProps> = () => {
                     </MenubarItem>
                     <MenubarSeparator />
                     <MenubarSub>
-                        <MenubarSubTrigger>
+                        <MenubarSubTrigger disabled={!canEdit}>
                             {t('menu.actions.import')}
                         </MenubarSubTrigger>
                         <MenubarSubContent>
-                            <MenubarItem onClick={openImportDiagramDialog}>
+                            <MenubarItem onClick={openImportDiagramDialog} disabled={!canEdit}>
                                 .json
                             </MenubarItem>
                             <MenubarSeparator />
@@ -193,6 +208,7 @@ export const Menu: React.FC<MenuProps> = () => {
                                         initialImportMethod: 'ddl',
                                     })
                                 }
+                                disabled={!canEdit}
                             >
                                 SQL
                             </MenubarItem>
@@ -204,6 +220,7 @@ export const Menu: React.FC<MenuProps> = () => {
                                         initialImportMethod: 'dbml',
                                     })
                                 }
+                                disabled={!canEdit}
                             >
                                 DBML
                             </MenubarItem>
@@ -480,7 +497,7 @@ export const Menu: React.FC<MenuProps> = () => {
                     <MenubarItem onClick={openExportDiagramDialog}>
                         {t('menu.backup.export_diagram')}
                     </MenubarItem>
-                    <MenubarItem onClick={openImportDiagramDialog}>
+                    <MenubarItem onClick={openImportDiagramDialog} disabled={!canEdit}>
                         {t('menu.backup.restore_diagram')}
                     </MenubarItem>
                 </MenubarContent>

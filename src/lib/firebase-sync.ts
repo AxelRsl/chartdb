@@ -4,10 +4,23 @@ import {
     setDoc,
     onSnapshot,
     serverTimestamp,
+    collection,
+    addDoc,
+    getDocs,
+    query,
+    orderBy,
+    deleteDoc,
     type Unsubscribe,
 } from 'firebase/firestore';
 import { getFirestoreDB } from './firebase';
 import type { Diagram } from './domain/diagram';
+
+export interface DiagramRevision {
+    id: string;
+    timestamp: string;
+    label: string;
+    diagram: Diagram;
+}
 
 /**
  * Serialise a Diagram into a Firestore-safe plain object.
@@ -54,23 +67,70 @@ function deserialiseDiagram(data: Record<string, unknown>): Diagram {
 }
 
 /**
- * Save (or create) a diagram document in Firestore.
- * Uses `merge: true` so partial updates don't wipe existing fields.
+ * Save (or create) a diagram document in Firestore and push a new revision.
+ * Limits revisions to the 10 most recent, purging older ones.
  */
 export async function saveDiagramToFirebase(
     collabId: string,
-    diagram: Diagram
+    diagram: Diagram,
+    label = 'Versión guardada'
 ): Promise<void> {
     const firestore = getFirestoreDB();
     if (!firestore) return;
 
     try {
         const diagramRef = doc(firestore, 'diagrams', collabId);
-        await setDoc(diagramRef, serialiseDiagram(diagram), {
-            merge: true,
+        const serialised = serialiseDiagram(diagram);
+        await setDoc(diagramRef, serialised, { merge: true });
+
+        // Save a revision entry in subcollection
+        const revisionsRef = collection(firestore, 'diagrams', collabId, 'revisions');
+        const nowIso = new Date().toISOString();
+        await addDoc(revisionsRef, {
+            timestamp: nowIso,
+            label,
+            diagram: serialised,
+        });
+
+        // Enforce max 10 revisions limit by deleting oldest
+        const q = query(revisionsRef, orderBy('timestamp', 'asc'));
+        const snapshot = await getDocs(q);
+        if (snapshot.docs.length > 10) {
+            const docsToDelete = snapshot.docs.slice(0, snapshot.docs.length - 10);
+            for (const docSnap of docsToDelete) {
+                await deleteDoc(docSnap.ref);
+            }
+        }
+    } catch (error) {
+        console.error('[Firebase] Error saving diagram and revision:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get all available revisions for a diagram (max 10), ordered newest first.
+ */
+export async function getDiagramRevisions(collabId: string): Promise<DiagramRevision[]> {
+    const firestore = getFirestoreDB();
+    if (!firestore) return [];
+
+    try {
+        const revisionsRef = collection(firestore, 'diagrams', collabId, 'revisions');
+        const q = query(revisionsRef, orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+
+        return snapshot.docs.map((docSnap) => {
+            const data = docSnap.data();
+            return {
+                id: docSnap.id,
+                timestamp: data.timestamp as string,
+                label: (data.label as string) ?? 'Versión guardada',
+                diagram: deserialiseDiagram(data.diagram as Record<string, unknown>),
+            };
         });
     } catch (error) {
-        console.error('[Firebase] Error saving diagram:', error);
+        console.error('[Firebase] Error fetching revisions:', error);
+        return [];
     }
 }
 
@@ -114,3 +174,4 @@ export function subscribeToFirebaseDiagram(
         }
     );
 }
+

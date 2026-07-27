@@ -31,6 +31,7 @@ import { useCanvas } from '@/hooks/use-canvas';
 import { defaultSchemas } from '@/lib/data/default-schemas';
 import { useAlert } from '@/context/alert-context/alert-context';
 import { arrangeTablesForArea } from '@/lib/utils/area-utils';
+import { useFirebaseCollab } from '@/hooks/use-firebase-collab';
 
 export const CanvasContextMenu: React.FC<React.PropsWithChildren> = ({
     children,
@@ -55,8 +56,10 @@ export const CanvasContextMenu: React.FC<React.PropsWithChildren> = ({
     const { showDBViews } = useLocalConfig();
     const { setEditTableModeTable, reorderTables } = useCanvas();
     const { showAlert } = useAlert();
+    const { canEdit } = useFirebaseCollab();
 
     const { isMd: isDesktop } = useBreakpoint('md');
+    const effectiveReadonly = readonly || !canEdit;
 
     // Reactively detect selected tables
     const selectedTableIds = useStore((state) =>
@@ -291,7 +294,7 @@ export const CanvasContextMenu: React.FC<React.PropsWithChildren> = ({
 
     return (
         <ContextMenu>
-            <ContextMenuTrigger disabled={readonly}>
+            <ContextMenuTrigger disabled={effectiveReadonly}>
                 {children}
             </ContextMenuTrigger>
             <ContextMenuContent>

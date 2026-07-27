@@ -17,6 +17,7 @@ import { filterTable } from '@/lib/domain/diagram-filter/filter';
 import { defaultSchemas } from '@/lib/data/default-schemas';
 import { ButtonWithAlternatives } from '@/components/button/button-with-alternatives';
 import { useLocalConfig } from '@/hooks/use-local-config';
+import { useFirebaseCollab } from '@/hooks/use-firebase-collab';
 
 export interface TablesSectionProps {}
 
@@ -31,6 +32,10 @@ export const TablesSection: React.FC<TablesSectionProps> = () => {
     const [filterText, setFilterText] = React.useState('');
     const { showDBViews } = useLocalConfig();
     const filterInputRef = React.useRef<HTMLInputElement>(null);
+    const { canEdit } = useFirebaseCollab();
+
+    // Restricted users (not owner, not on shared link) cannot add tables
+    const effectiveReadonly = readonly || !canEdit;
 
     // First, filter tables by the diagram filter (schemas/tables visibility)
     // This is computed once and reused for both filteredTables and allTablesHiddenByDiagramFilter
@@ -156,7 +161,7 @@ export const TablesSection: React.FC<TablesSectionProps> = () => {
                         onChange={(e) => setFilterText(e.target.value)}
                     />
                 </div>
-                {!readonly ? (
+                {!effectiveReadonly ? (
                     <ButtonWithAlternatives
                         variant="secondary"
                         className="h-8 p-2 text-xs"
@@ -213,7 +218,7 @@ export const TablesSection: React.FC<TablesSectionProps> = () => {
                             )}
                             className="mt-20"
                             secondaryAction={
-                                !readonly
+                                !effectiveReadonly
                                     ? {
                                           label: t(
                                               'side_panel.tables_section.add_table'

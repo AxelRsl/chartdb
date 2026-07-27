@@ -64,7 +64,7 @@ export const ShareButton: React.FC = () => {
         setSaveError(null);
         try {
             const newCollabId = generateId();
-            await saveDiagramToFirebase(newCollabId, currentDiagram);
+            await saveDiagramToFirebase(newCollabId, currentDiagram, 'Versión inicial compartida');
 
             // Set URL search param ?id=newCollabId so app enters collab mode
             setSearchParams({ id: newCollabId }, { replace: true });

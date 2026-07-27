@@ -9,6 +9,7 @@ import { Menu } from './menu/menu';
 import { useFirebaseCollab } from '@/hooks/use-firebase-collab';
 import { CollabIndicator } from '@/components/collab-indicator/collab-indicator';
 import { ShareButton } from '@/components/share-button/share-button';
+import { CollabActions } from '@/components/collab-actions/collab-actions';
 
 export interface TopNavbarProps {}
 
@@ -57,6 +58,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = () => {
                         isConnected={isConnected}
                     />
                 )}
+                <CollabActions />
                 <ShareButton />
                 <LastSaved />
                 {renderStars()}

@@ -31,6 +31,8 @@ import { DiagramFilterProvider } from '@/context/diagram-filter-context/diagram-
 const OPEN_STAR_US_AFTER_SECONDS = 30;
 const SHOW_STAR_US_AGAIN_AFTER_DAYS = 1;
 
+import { RestrictedOverlay } from '@/components/restricted-overlay/restricted-overlay';
+
 export const EditorDesktopLayoutLazy = React.lazy(
     () => import('./editor-desktop-layout')
 );
@@ -108,6 +110,7 @@ const EditorPageComponent: React.FC = () => {
                     )}
                 </Suspense>
             </section>
+            <RestrictedOverlay />
             <Toaster />
         </>
     );

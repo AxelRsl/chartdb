@@ -34,6 +34,7 @@ import {
     type DBCustomType,
 } from '@/lib/domain/db-custom-type';
 import { getDefaultPrimaryKeyType } from '@/lib/data/data-types/data-types';
+import { useFirebaseCollab } from '@/hooks/use-firebase-collab';
 
 export interface ChartDBProviderProps {
     diagram?: Diagram;
@@ -102,9 +103,11 @@ export const ChartDBProvider: React.FC<
         [databaseType]
     );
 
+    const { canEdit } = useFirebaseCollab();
+
     const readonly = useMemo(
-        () => readonlyProp ?? hasDiff ?? false,
-        [readonlyProp, hasDiff]
+        () => readonlyProp ?? hasDiff ?? (!canEdit || false),
+        [readonlyProp, hasDiff, canEdit]
     );
 
     const schemas = useMemo(

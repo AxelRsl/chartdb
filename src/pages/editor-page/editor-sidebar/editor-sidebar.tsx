@@ -30,6 +30,7 @@ import { useChartDB } from '@/hooks/use-chartdb';
 import { supportsCustomTypes } from '@/lib/domain/database-capabilities';
 import { useDialog } from '@/hooks/use-dialog';
 import { Separator } from '@/components/separator/separator';
+import { useFirebaseCollab } from '@/hooks/use-firebase-collab';
 
 export interface SidebarItem {
     title: string;
@@ -53,27 +54,31 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = () => {
     const { effectiveTheme } = useTheme();
     const { databaseType } = useChartDB();
     const { openCreateDiagramDialog, openOpenDiagramDialog } = useDialog();
+    const { isCollaborator } = useFirebaseCollab();
 
     const diagramItems: SidebarItem[] = useMemo(
-        () => [
-            {
-                title: t('editor_sidebar.new_diagram'),
-                icon: Plus,
-                onClick: () => {
-                    openCreateDiagramDialog();
-                },
-                active: false,
-            },
-            {
-                title: t('editor_sidebar.browse'),
-                icon: FolderOpen,
-                onClick: () => {
-                    openOpenDiagramDialog();
-                },
-                active: false,
-            },
-        ],
-        [t, openCreateDiagramDialog, openOpenDiagramDialog]
+        () =>
+            isCollaborator
+                ? []
+                : [
+                      {
+                          title: t('editor_sidebar.new_diagram'),
+                          icon: Plus,
+                          onClick: () => {
+                              openCreateDiagramDialog();
+                          },
+                          active: false,
+                      },
+                      {
+                          title: t('editor_sidebar.browse'),
+                          icon: FolderOpen,
+                          onClick: () => {
+                              openOpenDiagramDialog();
+                          },
+                          active: false,
+                      },
+                  ],
+        [t, openCreateDiagramDialog, openOpenDiagramDialog, isCollaborator]
     );
 
     const baseItems: SidebarItem[] = useMemo(
