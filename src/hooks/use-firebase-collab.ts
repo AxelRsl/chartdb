@@ -87,6 +87,8 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
     const isRemoteUpdateRef = useRef(false);
     // Track whether we've loaded the initial remote diagram
     const hasLoadedRemoteRef = useRef(false);
+    // Track JSON snapshot of the last saved diagram state to avoid false unsaved change indicators
+    const lastSavedSnapshotRef = useRef<string>('');
 
     const isCollabMode = !!(collabId && isFirebaseConfigured());
 
@@ -99,12 +101,27 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
     const isRestricted = !isOwner && !isCollabMode;
     const canEdit = isOwner || isCollaborator;
 
+    // Helper to compute a structural JSON snapshot of a diagram
+    const getDiagramSnapshot = useCallback((diagram: Diagram | null): string => {
+        if (!diagram) return '';
+        return JSON.stringify({
+            name: diagram.name ?? '',
+            databaseType: diagram.databaseType ?? '',
+            tables: diagram.tables ?? [],
+            relationships: diagram.relationships ?? [],
+            areas: diagram.areas ?? [],
+            notes: diagram.notes ?? [],
+            customTypes: diagram.customTypes ?? [],
+        });
+    }, []);
+
     // ── Subscribe to Firestore onSnapshot ──────────────────────────
     useEffect(() => {
         if (!isCollabMode || !collabId) {
             setIsConnected(false);
             hasLoadedRemoteRef.current = false;
             setHasUnsavedChanges(false);
+            lastSavedSnapshotRef.current = '';
             return;
         }
 
@@ -116,6 +133,9 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
                 loadDiagramFromData(remoteDiagram);
                 hasLoadedRemoteRef.current = true;
                 setIsConnected(true);
+
+                // Update snapshot reference
+                lastSavedSnapshotRef.current = getDiagramSnapshot(remoteDiagram);
                 setHasUnsavedChanges(false);
 
                 // Reset the flag after a tick so subsequent local edits raise unsaved status
@@ -130,6 +150,7 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
             () => {
                 hasLoadedRemoteRef.current = true;
                 setIsConnected(true);
+                lastSavedSnapshotRef.current = getDiagramSnapshot(currentDiagram);
                 saveDiagramToFirebase(collabId, currentDiagram, 'Creación inicial');
             }
         );
@@ -144,18 +165,47 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
             unsubscribe();
             setIsConnected(false);
             hasLoadedRemoteRef.current = false;
+            lastSavedSnapshotRef.current = '';
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [collabId, isCollabMode]);
 
-    // Track local changes to set hasUnsavedChanges flag
+    // Track structural local changes to accurately set hasUnsavedChanges flag
     useEffect(() => {
         if (!isCollabMode || !collabId) return;
         if (isRemoteUpdateRef.current) return;
         if (!hasLoadedRemoteRef.current) return;
 
-        setHasUnsavedChanges(true);
-    }, [currentDiagram, isCollabMode, collabId]);
+        const currentSnapshot = getDiagramSnapshot(currentDiagram);
+        if (
+            lastSavedSnapshotRef.current &&
+            currentSnapshot !== lastSavedSnapshotRef.current
+        ) {
+            setHasUnsavedChanges(true);
+        } else if (
+            lastSavedSnapshotRef.current &&
+            currentSnapshot === lastSavedSnapshotRef.current
+        ) {
+            setHasUnsavedChanges(false);
+        }
+    }, [currentDiagram, isCollabMode, collabId, getDiagramSnapshot]);
+
+    // Browser close / reload protection pop-up when unsaved changes exist
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue =
+                    'Tienes cambios sin guardar en tu diagrama. ¿Seguro que quieres salir?';
+                return e.returnValue;
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [hasUnsavedChanges]);
 
     // ── Manual Commit / Save function ("Aceptar cambios") ──────────
     const saveToFirebase = useCallback(
@@ -165,6 +215,7 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
             setIsSaving(true);
             try {
                 await saveDiagramToFirebase(collabId, currentDiagram, label);
+                lastSavedSnapshotRef.current = getDiagramSnapshot(currentDiagram);
                 setHasUnsavedChanges(false);
             } catch (error) {
                 console.error('[Firebase] Error saving diagram:', error);
@@ -173,7 +224,7 @@ export function useFirebaseCollab(): UseFirebaseCollabReturn {
                 setIsSaving(false);
             }
         },
-        [isCollabMode, collabId, currentDiagram]
+        [isCollabMode, collabId, currentDiagram, getDiagramSnapshot]
     );
 
     const loginGoogle = useCallback(async () => {
