@@ -14,7 +14,6 @@ export const CollabActions: React.FC = () => {
         isSaving,
         saveToFirebase,
         isOwner,
-        isCollaborator,
         user,
         loginGoogle,
         logoutGoogleAuth,
