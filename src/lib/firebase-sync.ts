@@ -22,6 +22,16 @@ export interface DiagramRevision {
     diagram: Diagram;
 }
 
+function toIsoString(val: unknown): string {
+    if (!val) return new Date().toISOString();
+    if (val instanceof Date) return val.toISOString();
+    if (typeof val === 'string') {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+    }
+    return new Date().toISOString();
+}
+
 /**
  * Serialise a Diagram into a Firestore-safe plain object.
  * Firestore cannot store JS Date objects directly when using
@@ -30,7 +40,7 @@ export interface DiagramRevision {
 function serialiseDiagram(diagram: Diagram): Record<string, unknown> {
     return {
         id: diagram.id,
-        name: diagram.name,
+        name: diagram.name ?? 'Diagrama sin título',
         databaseType: diagram.databaseType,
         databaseEdition: diagram.databaseEdition ?? null,
         tables: JSON.parse(JSON.stringify(diagram.tables ?? [])),
@@ -39,8 +49,8 @@ function serialiseDiagram(diagram: Diagram): Record<string, unknown> {
         areas: JSON.parse(JSON.stringify(diagram.areas ?? [])),
         customTypes: JSON.parse(JSON.stringify(diagram.customTypes ?? [])),
         notes: JSON.parse(JSON.stringify(diagram.notes ?? [])),
-        createdAt: diagram.createdAt.toISOString(),
-        updatedAt: diagram.updatedAt.toISOString(),
+        createdAt: toIsoString(diagram.createdAt),
+        updatedAt: toIsoString(diagram.updatedAt),
         _serverUpdatedAt: serverTimestamp(),
     };
 }
