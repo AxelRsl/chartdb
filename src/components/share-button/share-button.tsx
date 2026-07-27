@@ -58,7 +58,7 @@ export const ShareButton: React.FC = () => {
         }
     }, []);
 
-    // Generate a unique collab ID, save to Firestore, update URL params, and copy link
+    // Save diagram to Firestore using existing diagram ID or activeCollabId, and copy persistent link
     const handleGenerateLink = useCallback(async () => {
         if (!currentDiagram) {
             setSaveError('No hay un diagrama activo para compartir.');
@@ -68,17 +68,19 @@ export const ShareButton: React.FC = () => {
         setIsSaving(true);
         setSaveError(null);
         try {
-            const newCollabId = generateId();
+            // Re-use current diagram ID or activeCollabId so the link is permanent and never changes
+            const collabIdToUse = activeCollabId || currentDiagram.id || generateId();
+
             await saveDiagramToFirebase(
-                newCollabId,
+                collabIdToUse,
                 currentDiagram,
                 'Versión inicial compartida'
             );
 
-            // Set URL search param ?id=newCollabId so app enters collab mode
-            setSearchParams({ id: newCollabId }, { replace: true });
+            // Set URL search param ?id=collabIdToUse so app enters collab mode
+            setSearchParams({ id: collabIdToUse }, { replace: true });
 
-            const newUrl = `${window.location.origin}/?id=${encodeURIComponent(newCollabId)}`;
+            const newUrl = `${window.location.origin}/?id=${encodeURIComponent(collabIdToUse)}`;
             await copyToClipboard(newUrl);
         } catch (error: any) {
             console.error('[ShareButton] Error saving diagram:', error);
